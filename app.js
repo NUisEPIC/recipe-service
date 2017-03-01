@@ -1,20 +1,22 @@
 'use strict';
-var express = require('express');
-var path = require('path');
-var logger = require('morgan');
-var cookieParser = require('cookie-parser');
-var bodyParser = require('body-parser');
+const express = require('express');
+const path = require('path');
+const logger = require('morgan');
+const cookieParser = require('cookie-parser');
+const bodyParser = require('body-parser');
+const pg = require('pg-promise')();
+require('./env.js');
 
-var index = require('./routes/index');
-var users = require('./routes/users');
+const pgConnectionString = 'postgres://localhost:5432/recipedb'
+const db = pg(pgConnectionString);
 
-var app = express();
+const app = express();
 
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
-  res.header('Access-Control-Allow-Headers', 'Content-Type');
-  req.method === 'OPTIONS' ? res.sendStatus(200) : next();
+	res.header('Access-Control-Allow-Origin', '*');
+	res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
+	res.header('Access-Control-Allow-Headers', 'Content-Type');
+	req.method === 'OPTIONS' ? res.sendStatus(200) : next();
 });
 
 app.use(logger('dev'));
@@ -41,9 +43,19 @@ app.use(cookieParser());
 //});
 
 app.get('*', (req, res) => {
-  res.send('hi');
+	db.any('SELECT * FROM recipes;')
+		.then(function (data) {
+			res.status(200)
+				.json({
+					status: 'success',
+					data: data,
+					message: 'Retrieved ALL recipes'
+				});
+		})
+		.catch(function (err) {
+			res.status(500).send(err);
+		});
 });
 
 app.listen(process.env.PORT || 8888);
 
-module.exports = app;

@@ -47,3 +47,6 @@ jspm_packages
 www/node_modules
 taco.json
 plugins/**/*
+
+#
+env.js
