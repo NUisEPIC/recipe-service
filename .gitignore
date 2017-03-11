@@ -50,3 +50,6 @@ plugins/**/*
 
 #
 env.js
+
+#
+sample-queries.txt

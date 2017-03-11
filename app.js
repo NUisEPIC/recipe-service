@@ -21,7 +21,7 @@ app.use((req, res, next) => {
 
 app.use(logger('dev'));
 app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // catch 404 and forward to error handler
@@ -42,7 +42,49 @@ app.use(cookieParser());
 //  res.render('error');
 //});
 
-app.get('*', (req, res) => {
+// post request handler for filtering via the search bar
+app.post('/', function(req,res) {
+	//make query to db using data in req.body
+	console.log(req.body); //temp
+	var allergies = req.body.allergies;
+	var diet = req.body.diet;
+	var keywords = req.body.data.split(' '); // angelo - stil need to add single quotes around each element ofthe array
+	keywords = keywords.join(", ");
+	var query = "SELECT * FROM recipes WHERE id IN (SELECT recipe_id FROM ingredients_recipes INNER JOIN ingredients ON ingredients.id = ingredients_recipes.ingredient_id WHERE ingredients.ingredient IN (" + keywords+ "));";
+	console.log(query);
+	db.any(query)
+		.then(function (data) {
+			res.status(200)
+				.json({
+					status: 'success',
+					data: req.body,
+					message: 'Retrieved messages matching search words'
+				});
+		})
+		.catch(function (err) {
+			res.status(500).send(err);
+		});
+});
+
+// get request handler for getting info specific to one recipe
+app.get('/recipe-details/:id', function(req, res) {
+	//res.send(req.body); //debugging statement
+	//console.log("the /recipe-details/:id handler is being used"); //debugging statement
+	db.any('SELECT * FROM recipes;') //temp query, change to get specific recipe id
+	.then(function (data) {
+		res.status(200)
+			.json({
+				status:'success',
+				data: data,
+				message: 'Retrieved recipe id: ' + req.params.id
+			})
+	.catch(function (err) {
+			res.status(500).send(err);
+		});
+	});
+});
+
+app.get('/', (req, res) => { //changed route from '*' to '/'
 	db.any('SELECT * FROM recipes;')
 		.then(function (data) {
 			res.status(200)
@@ -58,4 +100,6 @@ app.get('*', (req, res) => {
 });
 
 app.listen(process.env.PORT || 8888);
+console.log('Listening to port: ' + process.env.PORT);
+
 
