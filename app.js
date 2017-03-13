@@ -42,13 +42,17 @@ app.use(cookieParser());
 //  res.render('error');
 //});
 
-// post request handler for filtering via the search bar
-app.post('/', function(req,res) {
+// get request handler for keyword search and filtering via drop downs
+app.get('/search/', function(req,res) {
 	//make query to db using data in req.body
+	res.send(req.body);
 	console.log(req.body); //temp
 	var allergies = req.body.allergies;
 	var diet = req.body.diet;
 	var keywords = req.body.data.split(' '); // angelo - stil need to add single quotes around each element ofthe array
+	for (var i=0; i<keywords.length; i++) { // nvm - fixed
+		keywords[i] = "'" + keywords[i] + "'";
+	}
 	keywords = keywords.join(", ");
 	var query = "SELECT * FROM recipes WHERE id IN (SELECT recipe_id FROM ingredients_recipes INNER JOIN ingredients ON ingredients.id = ingredients_recipes.ingredient_id WHERE ingredients.ingredient IN (" + keywords+ "));";
 	console.log(query);
@@ -57,7 +61,7 @@ app.post('/', function(req,res) {
 			res.status(200)
 				.json({
 					status: 'success',
-					data: req.body,
+					data: data,
 					message: 'Retrieved messages matching search words'
 				});
 		})
@@ -70,7 +74,9 @@ app.post('/', function(req,res) {
 app.get('/recipe-details/:id', function(req, res) {
 	//res.send(req.body); //debugging statement
 	//console.log("the /recipe-details/:id handler is being used"); //debugging statement
-	db.any('SELECT * FROM recipes;') //temp query, change to get specific recipe id
+	var query = 'SELECT * FROM recipes WHERE id = ' + req.params.id + ';';
+	console.log(query); //debugging statement
+	db.any(query)
 	.then(function (data) {
 		res.status(200)
 			.json({
@@ -78,10 +84,10 @@ app.get('/recipe-details/:id', function(req, res) {
 				data: data,
 				message: 'Retrieved recipe id: ' + req.params.id
 			})
+		})
 	.catch(function (err) {
 			res.status(500).send(err);
 		});
-	});
 });
 
 app.get('/', (req, res) => { //changed route from '*' to '/'
@@ -91,7 +97,7 @@ app.get('/', (req, res) => { //changed route from '*' to '/'
 				.json({
 					status: 'success',
 					data: data,
-					message: 'Retrieved ALL recipes'
+					message: 'Retrieved ALL recipes.'
 				});
 		})
 		.catch(function (err) {
