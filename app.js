@@ -9,14 +9,13 @@ require('./env.js');
 
 const pgConnectionString = 'postgres://localhost:5432/recipedb'
 const db = pg(pgConnectionString);
-
 const app = express();
 
 app.use((req, res, next) => {
-	res.header('Access-Control-Allow-Origin', '*');
-	res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
-	res.header('Access-Control-Allow-Headers', 'Content-Type');
-	req.method === 'OPTIONS' ? res.sendStatus(200) : next();
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
+    res.header('Access-Control-Allow-Headers', 'Content-Type');
+    req.method === 'OPTIONS' ? res.sendStatus(200) : next();
 });
 
 app.use(logger('dev'));
@@ -43,69 +42,83 @@ app.use(cookieParser());
 //});
 
 // get request handler for keyword search and filtering via drop downs
-app.get('/search/', function(req,res) {
-	//make query to db using data in req.body
-	res.send(req.body);
-	console.log(req.body); //temp
-	var allergies = req.body.allergies;
-	var diet = req.body.diet;
-	var keywords = req.body.data.split(' '); // angelo - stil need to add single quotes around each element ofthe array
-	for (var i=0; i<keywords.length; i++) { // nvm - fixed
-		keywords[i] = "'" + keywords[i] + "'";
-	}
-	keywords = keywords.join(", ");
-	var query = "SELECT * FROM recipes WHERE id IN (SELECT recipe_id FROM ingredients_recipes INNER JOIN ingredients ON ingredients.id = ingredients_recipes.ingredient_id WHERE ingredients.ingredient IN (" + keywords+ "));";
-	console.log(query);
-	db.any(query)
-		.then(function (data) {
-			res.status(200)
-				.json({
-					status: 'success',
-					data: data,
-					message: 'Retrieved messages matching search words'
-				});
-		})
-		.catch(function (err) {
-			res.status(500).send(err);
-		});
+app.get('/recipes/search', (req, res) => {
+    let allergies = req.body.allergies;
+    let diet = req.body.diet;
+    let keywords = req.body.data;
+    keywords = keywords.map(x => {
+        return `'${x}'`;
+    });
+    let query = `
+        SELECT *
+        FROM recipes
+        WHERE id IN
+            (SELECT recipe_id
+            FROM ingredients_recipes
+            INNER JOIN ingredients ON ingredients.id = ingredients_recipes.ingredient_id
+            WHERE ingredients.ingredient IN (${keywords}));
+    `;
+    console.log(query);
+    db.any(query)
+    .then(data => {
+        res.status(200).json({
+            status: 'success',
+            data: processRecipes(data),
+            message: 'Retrieved messages matching search words'
+        });
+    })
+    .catch(err => {
+        console.error(err);
+        res.status(500).send(err);
+    });
 });
 
-// get request handler for getting info specific to one recipe
-app.get('/recipe-details/:id', function(req, res) {
-	//res.send(req.body); //debugging statement
-	//console.log("the /recipe-details/:id handler is being used"); //debugging statement
-	var query = 'SELECT * FROM recipes WHERE id = ' + req.params.id + ';';
-	console.log(query); //debugging statement
-	db.any(query)
-	.then(function (data) {
-		res.status(200)
-			.json({
-				status:'success',
-				data: data,
-				message: 'Retrieved recipe id: ' + req.params.id
-			})
-		})
-	.catch(function (err) {
-			res.status(500).send(err);
-		});
+app.get('/recipes/:id', (req, res) => {
+    let query = `SELECT * FROM recipes WHERE id = ${req.params.id};`;
+    db.any(query)
+    .then(data => {
+        res.status(200).json({
+            status: 200,
+            data: processRecipes(data),
+            message: `Retrieved recipe id: ${req.params.id}`
+        })
+    })
+    .catch(err => {
+        console.error(err);
+        res.status(500).send(err);
+    });
 });
 
-app.get('/', (req, res) => { //changed route from '*' to '/'
-	db.any('SELECT * FROM recipes;')
-		.then(function (data) {
-			res.status(200)
-				.json({
-					status: 'success',
-					data: data,
-					message: 'Retrieved ALL recipes.'
-				});
-		})
-		.catch(function (err) {
-			res.status(500).send(err);
-		});
+app.get('/recipes', (req, res) => {
+    db.any('SELECT * FROM recipes;')
+    .then(data => {
+        res.status(200).json({
+            status: 200,
+            data: processRecipes(data),
+            message: 'Retrieved ALL recipes.'
+        });
+    })
+    .catch(err => {
+        console.error(err);
+        res.status(500).send(err);
+    });
 });
+
+// Shim because the current PSQL schema is weird and I don't want to fix it.
+// TODO: Change the schema to use arrays instead of strings duh
+function processRecipes(recipes) {
+    return recipes.map(recipe => {
+        recipe.machine_title = recipe.meal_title.trim().split(' ').join('_');
+        recipe.ingredients = recipe.ingredients.split(', ');
+        recipe.instructions = split(recipe.instructions);
+        return recipe;
+    });
+}
+
+function split(list) {
+    if (list == null) return null;
+    return list.substring(3).split(/, [0-9]\./);
+}
 
 app.listen(process.env.PORT || 8888);
-console.log('Listening to port: ' + process.env.PORT);
-
-
+console.log(`Listening to port: ${process.env.PORT || 8888}...`);
